@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mongo-express
+  name: mongo-express
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-express
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: mongo-express
+    spec:
+      restartPolicy: Always
+      containers:
+      - image: mongo-express
+        name: mongo-express
+        ports: 
+        - containerPort: 8081
+        env:
+        - name: ME_CONFIG_MONGODB_ADMINUSERNAME
+          valueFrom: 
+            secretKeyRef:
+              name: mongodb-secret
+              key: MONGO_INITDB_ROOT_USERNAME
+
+        - name: ME_CONFIG_MONGODB_ADMINPASSWORD 
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: MONGO_INITDB_ROOT_PASSWORD
+
+        - name: ME_CONFIG_MONGODB_SERVER
+          value: mongodb-service
+
+        - name: ME_CONFIG_MONGODB_URL
+          value: mongodb-service 
+
+        resources: {}
+status: {}

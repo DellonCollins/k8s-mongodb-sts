@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-configmap
+  namespace: default
+data:
+  MONGO_DATABASE_URL: mongo-service
+  MONGO_DB_PATH: /data/db

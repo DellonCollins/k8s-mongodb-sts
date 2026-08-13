@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mongo-express-service
+  name: mongo-express-service
+spec:
+  ports:
+  - name: 8081-8081
+    port: 8081
+    protocol: TCP
+    targetPort: 8081
+  selector:
+    app: mongo-express
+  type: LoadBalancer
+status:
+  loadBalancer: {}

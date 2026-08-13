@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: mongodb
+  name: mongodb
+spec:
+  volumeClaimTemplates:                    
+  - metadata:
+      name: mongo-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: local-storage
+      resources:
+        requests:
+          storage: 1Gi
+
+  replicas: 3 
+  serviceName: "mongodb-service"
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      volumes:
+        - name: keyfile
+          secret:
+            secretName: mongodb-secret
+            items:
+              - key: MONGO_REPLICASET_KEY
+                path: keyfile
+        - name: mongo-storage
+          persistentVolumeClaim:
+            claimName: mongodb-pvc		
+      containers:
+      - image: mongo
+        name: mongodb
+        volumeMounts:
+        - name: keyfile
+          mountPath: /var/secret
+        - name: mongo-storage
+          mountPath: /data/db
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: MONGO_INITDB_ROOT_USERNAME
+              name: mongodb-secret
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: MONGO_INITDB_ROOT_PASSWORD
+              name: mongodb-secret
+  
+# Secret volumes are readonly and keyfiles need specific permission and ownership to be used by mongodb
+        lifecycle:
+          postStart:
+            exec:
+              command: ["bash", "-c", "cp /var/secret/keyfile /run/secrets/keyfile && chmod 400 /run/secrets/keyfile && chown mongodb:mongodb /run/secrets/keyfile"]
+        args: ["--replSet", "rs0", "--keyFile", "/run/secrets/keyfile"  ]
+      resources: {}
+status: {}
