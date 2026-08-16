@@ -1,0 +1,23 @@
+#!/usr/env/bin bash
+
+# create at rest encryption key
+enc_key=$(head -c 32 /dev/urandom | base64)
+# use | because the a base64 key may have a "/"
+sed "s|<encryption-key>|$enc_key|" enc-template.yaml > enc.yaml
+
+minikube ssh -- sudo cat /etc/kubernetes/manifests/kube-apiserver.yaml > kube-apiserver.yaml
+
+# add encryption config to kube-apiserver.yaml
+yq '.spec.containers[].command |= (. + ["--encryption-provider-config=/etc/kubernetes/enc/enc.yaml"]  | unique)' kube-apiserver.yaml | \
+# ensure that kube-apiserver is first in the list since yq auto sorts keys
+yq '.spec.containers[].command |= (sort_by(.) | reverse)' | \
+yq '.spec.containers[].volumeMounts |= (. + [{"mountPath": "/etc/kubernetes/enc", "name": "enc", "readOnly": true}]  | unique)' | \
+yq --yaml-output '.spec.volumes |= (. + [{ "hostPath": { "path": "/etc/kubernetes/enc", "type": "DirectoryOrCreate" }, "name": "enc" }] | unique )' \
+> new-kube-apiserver.yaml
+
+minikube cp enc.yaml /etc/kubernetes/enc/enc.yaml
+minikube cp new-kube-apiserver.yaml /etc/kubernetes/manifests/kube-apiserver.yaml
+
+echo "Encryption config copied and added to kube-apiserver manifest"
+echo "Files are stored in enc.yaml and new-kube-apiserver.yaml"
+echo "Restart the cluster for changes to take effect"
