@@ -1,23 +1,47 @@
-#!/usr/env/bin bash
+#!/usr/bin/env bash
 
-# create at rest encryption key
-enc_key=$(head -c 32 /dev/urandom | base64)
-# use | because the a base64 key may have a "/"
-sed "s|<encryption-key>|$enc_key|" enc-template.yaml > enc.yaml
+# install etcd-client and hexdump for monitoring at-rest encryption
+echo "Installing etcd and bsdmainutils pkgs for monitoring at-rest encryption"
+minikube ssh -- "sudo apt-get update -y && sudo apt-get install -y etcd-client && sudo apt-get install -y bsdmainutils"
+echo
 
+# create at rest encryption key if the file doesn't exist
+if [[ ! -s enc.yaml ]] ; then # if enc.yaml exists and is not empty, assume it is valid
+	echo "Created 32-byte encryption key in enc.yaml"
+	enc_key=$(head -c 32 /dev/urandom | base64)
+	# use | because the a base64 key may have a "/"
+	sed "s|<encryption-key>|$enc_key|" enc-template.yaml > enc.yaml
+else
+	echo "enc.yaml already exists. Skipping new key generation"
+fi
+
+echo "Adding at-rest encryption to /etc/kubernetes/manifests/kube-apiserver.yaml"
 minikube ssh -- sudo cat /etc/kubernetes/manifests/kube-apiserver.yaml > kube-apiserver.yaml
 
 # add encryption config to kube-apiserver.yaml
 yq '.spec.containers[].command |= (. + ["--encryption-provider-config=/etc/kubernetes/enc/enc.yaml"]  | unique)' kube-apiserver.yaml | \
 # ensure that kube-apiserver is first in the list since yq auto sorts keys
 yq '.spec.containers[].command |= (sort_by(.) | reverse)' | \
+# mount enc.yaml from control plane
 yq '.spec.containers[].volumeMounts |= (. + [{"mountPath": "/etc/kubernetes/enc", "name": "enc", "readOnly": true}]  | unique)' | \
 yq --yaml-output '.spec.volumes |= (. + [{ "hostPath": { "path": "/etc/kubernetes/enc", "type": "DirectoryOrCreate" }, "name": "enc" }] | unique )' \
 > new-kube-apiserver.yaml
+echo "Kube-apiserver saved locally in new-kube-apiserver.yaml"
+
+
+# hexdump the values for all configmaps and secrets. 
+minikube ssh -- 'cd /var/lib/minikube/certs/etcd && sudo etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get /registry/ --prefix --keys-only | grep -E "configmap|secret" | sudo xargs -I "{}" etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get "{}" | hexdump -C'
+echo
 
 minikube cp enc.yaml /etc/kubernetes/enc/enc.yaml
 minikube cp new-kube-apiserver.yaml /etc/kubernetes/manifests/kube-apiserver.yaml
 
 echo "Encryption config copied and added to kube-apiserver manifest"
-echo "Files are stored in enc.yaml and new-kube-apiserver.yaml"
-echo "Restart the cluster for changes to take effect"
+echo "Restarting the cluster to apply changes"
+minikube start
+
+echo -e "\nApplying encryption to existing secrets and configmaps. Restart server to apply changes"
+kubectl get secrets --all-namespaces -o json | kubectl replace -f -
+kubectl get configmaps --all-namespaces -o json | kubectl replace -f -
+
+echo -e "\nRemove the identity provider from enc.yaml on the control plane then restart it to disable unencrypted values"
