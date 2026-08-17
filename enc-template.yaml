@@ -9,4 +9,4 @@ resources:
           keys:
             - name: key1
               secret: <encryption-key>
-      - identity: {}
+      - identity: {} # can remove after at-rest encryption is confirmed
