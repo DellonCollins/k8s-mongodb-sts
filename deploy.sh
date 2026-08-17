@@ -5,13 +5,14 @@ minikube start
 bash ./deploy_encryption
 
 # create configs
-echo "\nCreating secrets and configmap"
+echo -e "\nCreating secrets and configmap"
 kubectl create secret generic mongodb-secret --from-env-file=mongodb.env
 kubectl apply -f mongo-configmap.yaml
 
 # create mongodb backend
 echo -e "\nDeploying mongodb backend"
 kubectl apply -f mongodb-pv.yaml,mongodb-service.yaml,mongodb-sts.yaml
+echo
 kubectl rollout status --watch --timeout=600s statefulset/mongodb
 
 
@@ -24,11 +25,14 @@ echo -e "\nRun this command to initiate the replica set if initation fails"
 echo -e "\n$repl_set_cmd"
 
 eval $repl_set_cmd
-mongo_repl_set_init_status=$?
+if [[ $? -eq 0 ]] ; then 
+	echo "\nReplicaSet Initiation Successful"
+fi
 
 # create mongo-express frontend
 echo -e "\nDeploying mongo express frontend\n"
 kubectl apply -f mongo-express-d.yaml,mongo-express-service.yaml
+echo
 kubectl rollout status --watch --timeout=600s deployment/mongo-express
 
 # expose the mongo-express service when it's ready
