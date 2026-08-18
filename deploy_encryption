@@ -28,20 +28,49 @@ yq --yaml-output '.spec.volumes |= (. + [{ "hostPath": { "path": "/etc/kubernete
 > new-kube-apiserver.yaml
 echo "Kube-apiserver saved locally in new-kube-apiserver.yaml"
 
-
-# hexdump the values for all configmaps and secrets. 
-minikube ssh -- 'cd /var/lib/minikube/certs/etcd && sudo etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get /registry/ --prefix --keys-only | grep -E "configmap|secret" | sudo xargs -I "{}" etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get "{}" | hexdump -C'
-echo
-
 minikube cp enc.yaml /etc/kubernetes/enc/enc.yaml
 minikube cp new-kube-apiserver.yaml /etc/kubernetes/manifests/kube-apiserver.yaml
 
 echo "Encryption config copied and added to kube-apiserver manifest"
 echo "Restarting the cluster to apply changes"
-minikube start
+# kube-apiserver restarts on it's own the the yaml config is updated
+
+echo "Waiting on apiserver to restart"
+
+until [[ "`minikube status | grep apiserver`" =~ "Running" ]] ; do
+	echo .
+	sleep 1
+done
+
+minikube status
+
 
 echo -e "\nApplying encryption to existing secrets and configmaps. Restart server to apply changes"
 kubectl get secrets --all-namespaces -o json | kubectl replace -f -
 kubectl get configmaps --all-namespaces -o json | kubectl replace -f -
 
-echo -e "\nRemove the identity provider from enc.yaml on the control plane then restart it to disable unencrypted values"
+
+containers=$(minikube ssh -- docker ps -f name=apiserver --format '{{.ID}}')
+
+echo "APISERVER CONTAINER: $containers"
+
+# sending output to a file because the cursor position doesn't reset to the start of the line when you pipe it directly to other commands
+minikube ssh -- docker ps -f name=apiserver --format '{{.ID}}' > kube_api_server_pods.tmp
+
+while read container_id ; do 
+	echo "Restarting container: $container_id"
+	minikube ssh -- docker restart $container_id 
+	
+	while ! [[ "`minikube status | grep apiserver`" =~ "Running" ]]; do
+		printf "waiting on apiserver\r"
+		sleep 1
+	done
+done < kube_api_server_pods.tmp
+
+rm kube_api_server_pods.tmp
+
+# hexdump the values for all configmaps and secrets. 
+minikube ssh -- 'cd /var/lib/minikube/certs/etcd && sudo etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get /registry/ --prefix --keys-only | grep -E "configmap|secret" | sudo xargs -I "{}" etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get "{}" | hexdump -C'
+echo "You shouldn't be able to read any secrets or config values"
+
+echo -e "\nRemove the identity provider from enc.yaml on the control plane then restart the apiserver to disable unencrypted values"
