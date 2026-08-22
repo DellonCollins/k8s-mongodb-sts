@@ -4,7 +4,7 @@
 ## Create encryption yaml
 https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/#write-an-encryption-configuration-file
 
-In this project, secrets and configmaps are encrypted and saved in enc.yaml
+In this project, secrets and configmaps are encrypted and encryption configuration is saved in enc.yaml
 
 ## Add the encryption configuration to control plane node
 ```minikube cp enc.yaml /path/to/enc.yaml```
