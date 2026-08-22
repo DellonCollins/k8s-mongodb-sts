@@ -10,7 +10,7 @@ spec:
       name: mongo-storage
     spec:
       accessModes: [ "ReadWriteOnce" ]
-      storageClassName: local-storage
+      storageClassName: csi-hostpath-sc
       resources:
         requests:
           storage: 1Gi
