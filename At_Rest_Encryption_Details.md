@@ -38,7 +38,7 @@ sudo ETCDCTL_API=3 etcdctl --cacert ca.crt --cert server.crt --key server.key --
 sudo ETCDCTL_API=3 etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get /registry/ --prefix --keys-only | grep -E "configmap|secret"
 ```
 ## Get the values for the resources in question. 
-#You should see something like registry/secret/{namespace}/{resource-name}.k8s:enc:{encryption-provider}:v1:{key}
+You should see something like registry/secret/{namespace}/{resource-name}.k8s:enc:{encryption-provider}:v1:{key} followed by the resource value. It should be unreadable if encryption was properly enabled
 ```bash
 sudo etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get /registry/ --prefix --keys-only \
 | grep -E "configmap|secret" \
