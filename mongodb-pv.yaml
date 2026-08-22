@@ -1,3 +1,4 @@
+# Manually provisioned Persistent Volumes 
 apiVersion: v1
 kind: PersistentVolume
 metadata:
