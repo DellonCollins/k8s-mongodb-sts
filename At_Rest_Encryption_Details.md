@@ -1,5 +1,5 @@
 ## Generate key and store it securely
-head -c 32 /dev/urandom | base64
+```head -c 32 /dev/urandom | base64```
 
 ## Create encryption yaml
 https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/#write-an-encryption-configuration-file
@@ -7,33 +7,41 @@ https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/#write-an-encry
 In this project, secrets and configmaps are encrypted and saved in enc.yaml
 
 ## Add the encryption configuration to control plane node
-minikube cp enc.yaml /path/to/enc.yaml
+```minikube cp enc.yaml /path/to/enc.yaml```
 
 ## Edit the manifest for kube-apiserver to include the encryption configuration file
 Only resources created from this point forward will have encryption applied.
 This is done automatically in deploy_encryption.sh
 
 To apply encryption to all resources, run:
-kubectl get secrets --all-namespaces -o json | kubectl replace -f -
+```bash
+kubectl get secrets --all-namespaces -o json | kubectl replace -f - 
 kubectl get configmaps --all-namespaces -o json | kubectl replace -f -
+```
 
 ## View resources in etcd on control plane node
+```bash
+# etcd-client needs to be installed on the control plane before we can view
 minikube ssh
-#etcd-client needs to be installed on the control plane
 sudo apt-get update -y
 sudo apt-get install -y etcd-client
 sudo apt-get install -y bsdmainutils
+```
 
 ## Get all resources in the apiserver
+```bash
 cd /var/lib/minikube/certs/etcd
 sudo ETCDCTL_API=3 etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get /registry/ --prefix --keys-only
-
+```
 ## List the resources that we encrypted (configmaps & secrets)
+```bash
 sudo ETCDCTL_API=3 etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get /registry/ --prefix --keys-only | grep -E "configmap|secret"
-
+```
 ## Get the values for the resources in question. 
 #You should see something like registry/secret/{namespace}/{resource-name}.k8s:enc:{encryption-provider}:v1:{key}
+```bash
 sudo etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get /registry/ --prefix --keys-only \
 | grep -E "configmap|secret" \
 | sudo xargs -I '{}' etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get '{}' \
 | hexdump -C
+```
