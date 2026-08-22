@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # install etcd-client and hexdump for monitoring at-rest encryption
-echo "Installing etcd and bsdmainutils pkgs for monitoring at-rest encryption"
+echo -e "\nInstalling etcd and bsdmainutils pkgs for monitoring at-rest encryption"
 minikube ssh -- "sudo apt-get update -y && sudo apt-get install -y etcd-client && sudo apt-get install -y bsdmainutils"
 echo
 
@@ -12,10 +12,10 @@ if [[ ! -s enc.yaml ]] ; then # if enc.yaml exists and is not empty, assume it i
 	# use | because the a base64 key may have a "/"
 	sed "s|<encryption-key>|$enc_key|" enc-template.yaml > enc.yaml
 else
-	echo "enc.yaml already exists. Skipping new key generation"
+	echo -e "\nenc.yaml already exists. Skipping new key generation"
 fi
 
-echo "Adding at-rest encryption to /etc/kubernetes/manifests/kube-apiserver.yaml"
+echo -e "\nAdding at-rest encryption to /etc/kubernetes/manifests/kube-apiserver.yaml"
 minikube ssh -- sudo cat /etc/kubernetes/manifests/kube-apiserver.yaml > kube-apiserver.yaml
 
 # add encryption config to kube-apiserver.yaml
@@ -45,18 +45,17 @@ done
 minikube status
 
 
-echo -e "\nApplying encryption to existing secrets and configmaps. Restart server to apply changes"
+echo -e "Applying encryption to existing secrets and configmaps. Restart server to apply changes"
 kubectl get secrets --all-namespaces -o json | kubectl replace -f -
 kubectl get configmaps --all-namespaces -o json | kubectl replace -f -
 
 
 containers=$(minikube ssh -- docker ps -f name=apiserver --format '{{.ID}}')
 
-echo "APISERVER CONTAINER: $containers"
+echo -e "\nRESTARTING KUBE-APISERVER CONTAINERS: \n$containers"
 
 # sending output to a file because the cursor position doesn't reset to the start of the line when you pipe it directly to other commands
 minikube ssh -- docker ps -f name=apiserver --format '{{.ID}}' > kube_api_server_pods.tmp
-
 while read container_id ; do 
 	echo "Restarting container: $container_id"
 	minikube ssh -- docker restart $container_id 
@@ -69,8 +68,8 @@ done < kube_api_server_pods.tmp
 
 rm kube_api_server_pods.tmp
 
-# hexdump the values for all configmaps and secrets. 
+# hexdump the values for all configmaps and secrets. They should be encrypted. 
 minikube ssh -- 'cd /var/lib/minikube/certs/etcd && sudo etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get /registry/ --prefix --keys-only | grep -E "configmap|secret" | sudo xargs -I "{}" etcdctl --cacert ca.crt --cert server.crt --key server.key --endpoints https://127.0.0.1:2379 get "{}" | hexdump -C'
 echo "You shouldn't be able to read any secrets or config values"
 
-echo -e "\nRemove the identity provider from enc.yaml on the control plane then restart the apiserver to disable unencrypted values"
+echo -e "\nRemove the identity provider from enc.yaml on the control plane then restart the apiserver to completely disable plaintext entries"

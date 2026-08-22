@@ -2,6 +2,10 @@
 
 minikube start
 
+# enable volume snapshoting
+minikube addons enable csi-hostpath-driver
+minikube addons enable volumesnapshots
+
 bash ./deploy_encryption
 if [[ $? = 1 ]]; then 
 	echo "encryption deployment failed"; 
@@ -15,7 +19,8 @@ kubectl apply -f mongo-configmap.yaml
 
 # create mongodb backend
 echo -e "\nDeploying mongodb backend"
-kubectl apply -f mongodb-pv.yaml,mongodb-service.yaml,mongodb-sts.yaml
+# kubectl apply -f mongodb-pv.yaml
+kubectl apply -f mongodb-service.yaml,mongodb-sts.yaml
 echo
 kubectl rollout status --watch --timeout=600s statefulset/mongodb
 
