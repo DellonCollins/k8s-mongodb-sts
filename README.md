@@ -4,6 +4,6 @@ This project creates a stateful minikube cluster with at-rest encryption for sec
 
 ## Installation
 
--Install minikube
--Download the project
--Run ./deploy.sh to start the cluster
+- Install minikube
+- Download the project
+- Run ./deploy.sh to start the cluster
